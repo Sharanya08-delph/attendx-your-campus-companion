@@ -15,8 +15,8 @@ const FacultyLogin = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.endsWith('@ritchennai.edu.in')) {
-      toast.error('Please use your RIT college email (@ritchennai.edu.in)');
+    if (!email.endsWith('.ritchennai.edu.in')) {
+      toast.error('Please use your RIT college email (ending with .ritchennai.edu.in)');
       return;
     }
     if (login('faculty', email, password)) {
@@ -32,7 +32,7 @@ const FacultyLogin = () => {
       <form onSubmit={handleLogin} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email">College Email</Label>
-          <Input id="email" type="email" placeholder="yourname@ritchennai.edu.in" value={email} onChange={e => setEmail(e.target.value)} required />
+          <Input id="email" type="email" placeholder="yourname@cse.ritchennai.edu.in" value={email} onChange={e => setEmail(e.target.value)} required />
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
