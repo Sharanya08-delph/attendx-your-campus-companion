@@ -197,19 +197,32 @@ const StudentDashboard = () => {
 // OD Application Form Component
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Upload } from 'lucide-react';
+import { ArrowLeft, Upload, Plus, Trash2 } from 'lucide-react';
+import type { TeamMember } from '@/contexts/AuthContext';
 
 const ODApplicationForm = ({ onBack }: { onBack: () => void }) => {
   const { addODApplication } = useAuth();
   const [form, setForm] = useState({ eventName: '', date: '', time: '', venue: '' });
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([{ name: '', regNo: '', department: '' }]);
   const [proof, setProof] = useState<File | null>(null);
 
   const update = (key: string, value: string) => setForm(f => ({ ...f, [key]: value }));
+
+  const updateMember = (index: number, key: keyof TeamMember, value: string) => {
+    setTeamMembers(prev => prev.map((m, i) => i === index ? { ...m, [key]: value } : m));
+  };
+
+  const addMember = () => setTeamMembers(prev => [...prev, { name: '', regNo: '', department: '' }]);
+
+  const removeMember = (index: number) => {
+    if (teamMembers.length > 1) setTeamMembers(prev => prev.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     addODApplication({
       ...form,
+      teamMembers,
       proofUrl: proof ? URL.createObjectURL(proof) : undefined,
     });
     toast.success('OD Application submitted successfully!');
@@ -247,6 +260,36 @@ const ODApplicationForm = ({ onBack }: { onBack: () => void }) => {
           <Label htmlFor="venue">Venue</Label>
           <Input id="venue" placeholder="e.g. Anna University, Chennai" value={form.venue} onChange={e => update('venue', e.target.value)} required />
         </div>
+
+        {/* Team Members */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-base font-display font-bold">Team Members</Label>
+            <button type="button" onClick={addMember} className="flex items-center gap-1 text-xs text-primary font-semibold hover:underline">
+              <Plus className="w-3.5 h-3.5" /> Add Member
+            </button>
+          </div>
+          {teamMembers.map((member, index) => (
+            <div key={index} className="bg-muted/30 rounded-xl p-4 border border-border space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-muted-foreground">Member {index + 1}</span>
+                {teamMembers.length > 1 && (
+                  <button type="button" onClick={() => removeMember(index)} className="text-destructive hover:text-destructive/80">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Input placeholder="Full Name" value={member.name} onChange={e => updateMember(index, 'name', e.target.value)} required />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input placeholder="Reg No" value={member.regNo} onChange={e => updateMember(index, 'regNo', e.target.value)} required />
+                <Input placeholder="Department" value={member.department} onChange={e => updateMember(index, 'department', e.target.value)} required />
+              </div>
+            </div>
+          ))}
+        </div>
+
         <div className="space-y-2">
           <Label>Proof (Photo/Document)</Label>
           <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-6 cursor-pointer hover:border-primary/50 transition-colors bg-muted/30">
