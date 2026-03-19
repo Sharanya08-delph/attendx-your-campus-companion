@@ -17,7 +17,7 @@ const FacultyRegister = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.email.endsWith('.ritchennai.edu.in')) {
-      toast.error('Please use your RIT college email (ending with .ritchennai.edu.in)');
+      toast.error('Use only college mail ID');
       return;
     }
     if (form.password !== form.confirmPassword) {
