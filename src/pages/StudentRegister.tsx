@@ -78,7 +78,7 @@ const StudentRegister = () => {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="email">College Email</Label>
-          <Input id="email" type="email" placeholder="yourname@ritchennai.edu.in" value={form.email} onChange={e => update('email', e.target.value)} required />
+          <Input id="email" type="email" placeholder="yourname@cse.ritchennai.edu.in" value={form.email} onChange={e => update('email', e.target.value)} required />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="phone">Phone Number</Label>
