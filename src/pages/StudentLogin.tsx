@@ -16,7 +16,7 @@ const StudentLogin = () => {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.endsWith('.ritchennai.edu.in')) {
-      toast.error('Please use your RIT college email (ending with .ritchennai.edu.in)');
+      toast.error('Use only college mail ID');
       return;
     }
     if (login('student', email, password)) {
