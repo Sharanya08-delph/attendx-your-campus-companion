@@ -20,12 +20,19 @@ export interface FacultyData {
   phone: string;
 }
 
+export interface TeamMember {
+  name: string;
+  regNo: string;
+  department: string;
+}
+
 export interface ODApplication {
   id: string;
   eventName: string;
   date: string;
   time: string;
   venue: string;
+  teamMembers: TeamMember[];
   proofUrl?: string;
   status: 'pending' | 'approved' | 'rejected';
   submittedAt: string;
