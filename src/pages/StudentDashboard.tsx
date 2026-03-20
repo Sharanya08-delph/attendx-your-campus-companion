@@ -1,12 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, LogOut, Home, FileText, Bell, Award, ChevronRight, AlertTriangle } from 'lucide-react';
+import { User, LogOut, Home, FileText, Bell, Award, ChevronRight, AlertTriangle, ArrowLeft, Upload, Plus, Trash2, Camera, MapPin, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import type { TeamMember, Achievement } from '@/contexts/AuthContext';
 
-type Tab = 'home' | 'od' | 'profile';
+type Tab = 'home' | 'od' | 'achievement' | 'profile';
 
 const StudentDashboard = () => {
   const { studentData, logout } = useAuth();
@@ -26,6 +30,17 @@ const StudentDashboard = () => {
     logout();
     navigate('/');
     toast.success('Logged out successfully');
+  };
+
+  const statusLabel = (s: Achievement['status']) => {
+    const map: Record<string, string> = {
+      prize_winner_1: '🥇 1st Prize',
+      prize_winner_2: '🥈 2nd Prize',
+      prize_winner_3: '🥉 3rd Prize',
+      participant: '📋 Participant',
+      volunteer: '🤝 Volunteer',
+    };
+    return map[s] || s;
   };
 
   return (
@@ -127,12 +142,40 @@ const StudentDashboard = () => {
                   <p className="text-xs text-muted-foreground mt-1">Apply for On-Duty</p>
                   <ChevronRight className="w-4 h-4 text-primary mt-2 group-hover:translate-x-1 transition-transform" />
                 </button>
-                <div className="bg-card rounded-xl p-4 shadow-card border border-border text-left">
+                <button onClick={() => setActiveTab('achievement')} className="bg-card rounded-xl p-4 shadow-card border border-border hover:shadow-elevated transition-all text-left group">
                   <Award className="w-8 h-8 text-warning mb-2" />
                   <h4 className="font-display font-bold text-card-foreground text-sm">Achievements</h4>
                   <p className="text-xs text-muted-foreground mt-1">{studentData.achievements.length} recorded</p>
-                </div>
+                  <ChevronRight className="w-4 h-4 text-warning mt-2 group-hover:translate-x-1 transition-transform" />
+                </button>
               </div>
+
+              {/* Achievements List */}
+              {studentData.achievements.length > 0 && (
+                <div>
+                  <h3 className="font-display font-bold text-foreground mb-3">Recent Achievements</h3>
+                  <div className="space-y-3">
+                    {studentData.achievements.map(a => (
+                      <div key={a.id} className="bg-card rounded-xl p-4 shadow-card border border-border">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-card-foreground">{a.name}</h4>
+                          <span className="text-xs px-2 py-1 rounded-full font-semibold bg-warning/10 text-warning">
+                            {statusLabel(a.status)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">{a.date} • {a.department} - {a.section}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          {a.verified ? (
+                            <span className="text-xs flex items-center gap-1 text-success"><CheckCircle2 className="w-3.5 h-3.5" /> Verified</span>
+                          ) : (
+                            <span className="text-xs flex items-center gap-1 text-destructive"><XCircle className="w-3.5 h-3.5" /> Incomplete</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* OD History */}
               <div>
@@ -168,6 +211,12 @@ const StudentDashboard = () => {
               <ODApplicationForm onBack={() => setActiveTab('home')} />
             </motion.div>
           )}
+
+          {activeTab === 'achievement' && (
+            <motion.div key="achievement" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+              <AchievementForm onBack={() => setActiveTab('home')} />
+            </motion.div>
+          )}
         </AnimatePresence>
       </main>
 
@@ -177,6 +226,7 @@ const StudentDashboard = () => {
           {[
             { id: 'home' as Tab, icon: Home, label: 'Home' },
             { id: 'od' as Tab, icon: FileText, label: 'OD Apply' },
+            { id: 'achievement' as Tab, icon: Award, label: 'Achieve' },
             { id: 'profile' as Tab, icon: User, label: 'Profile' },
           ].map(tab => (
             <button
@@ -195,11 +245,6 @@ const StudentDashboard = () => {
 };
 
 // OD Application Form Component
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ArrowLeft, Upload, Plus, Trash2 } from 'lucide-react';
-import type { TeamMember } from '@/contexts/AuthContext';
-
 const ODApplicationForm = ({ onBack }: { onBack: () => void }) => {
   const { addODApplication } = useAuth();
   const [form, setForm] = useState({ eventName: '', date: '', time: '', venue: '' });
@@ -299,6 +344,334 @@ const ODApplicationForm = ({ onBack }: { onBack: () => void }) => {
           </label>
         </div>
         <Button type="submit" className="w-full gradient-primary text-primary-foreground font-semibold">Submit Application</Button>
+      </form>
+    </div>
+  );
+};
+
+// Achievement Form Component
+const AchievementForm = ({ onBack }: { onBack: () => void }) => {
+  const { addAchievement, studentData } = useAuth();
+  const [form, setForm] = useState({
+    name: studentData?.name || '',
+    regNo: studentData?.regNo || '',
+    department: studentData?.department || '',
+    section: studentData?.section || '',
+    date: '',
+    status: '' as Achievement['status'] | '',
+  });
+  const [certificate, setCertificate] = useState<File | null>(null);
+  const [certificatePreview, setCertificatePreview] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState('');
+  const [verificationStatus, setVerificationStatus] = useState<'idle' | 'ready' | 'incomplete'>('idle');
+  const [certVerifying, setCertVerifying] = useState(false);
+  const [certVerified, setCertVerified] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const update = (key: string, value: string) => setForm(f => ({ ...f, [key]: value }));
+
+  // Get live location
+  const fetchLocation = () => {
+    setLocationLoading(true);
+    setLocationError('');
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation not supported');
+      setLocationLoading(false);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setLocationLoading(false);
+        toast.success('Location fetched successfully');
+      },
+      (err) => {
+        setLocationError('Please enable location');
+        setLocationLoading(false);
+        toast.error('Please enable location');
+      },
+      { enableHighAccuracy: true }
+    );
+  };
+
+  useEffect(() => {
+    fetchLocation();
+  }, []);
+
+  // Update verification status
+  useEffect(() => {
+    if (photo && location) {
+      setVerificationStatus('ready');
+    } else if (photo || location) {
+      setVerificationStatus('incomplete');
+    } else {
+      setVerificationStatus('idle');
+    }
+  }, [photo, location]);
+
+  // Handle certificate upload with mock OCR verification
+  const handleCertificateUpload = (file: File) => {
+    setCertificate(file);
+    const url = URL.createObjectURL(file);
+    setCertificatePreview(url);
+    // Mock OCR verification
+    setCertVerifying(true);
+    setCertVerified(false);
+    setTimeout(() => {
+      setCertVerifying(false);
+      setCertVerified(true);
+      toast.success('Certificate verified via OCR ✅');
+    }, 2000);
+  };
+
+  // Handle photo upload
+  const handlePhotoUpload = (file: File) => {
+    setPhoto(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  // Capture photo from camera
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      streamRef.current = stream;
+      setShowCamera(true);
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 100);
+    } catch {
+      toast.error('Unable to access camera');
+    }
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const file = new File([blob], 'captured-photo.jpg', { type: 'image/jpeg' });
+        setPhoto(file);
+        setPhotoPreview(URL.createObjectURL(file));
+      }
+    }, 'image/jpeg');
+    stopCamera();
+  };
+
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    setShowCamera(false);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!photo) {
+      toast.error('Please upload image');
+      return;
+    }
+    if (!location) {
+      toast.error('Please enable location');
+      return;
+    }
+    if (!form.status) {
+      toast.error('Please select OD status');
+      return;
+    }
+    addAchievement({
+      name: form.name,
+      regNo: form.regNo,
+      department: form.department,
+      section: form.section,
+      date: form.date,
+      status: form.status as Achievement['status'],
+      certificateUrl: certificatePreview || undefined,
+      photoUrl: photoPreview || undefined,
+      latitude: location.lat,
+      longitude: location.lng,
+    });
+    toast.success('Achievement submitted successfully!');
+    onBack();
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <button onClick={onBack} className="p-2 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors">
+          <ArrowLeft className="w-5 h-5 text-foreground" />
+        </button>
+        <div>
+          <h2 className="text-xl font-display font-bold text-foreground">Achievement Form</h2>
+          <p className="text-sm text-muted-foreground">Record your achievement</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="bg-card rounded-2xl p-6 shadow-card border border-border space-y-5">
+        {/* Student Details */}
+        <div className="space-y-2">
+          <Label htmlFor="achName">Name</Label>
+          <Input id="achName" value={form.name} onChange={e => update('name', e.target.value)} required />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="achRegNo">Reg No</Label>
+            <Input id="achRegNo" value={form.regNo} onChange={e => update('regNo', e.target.value)} required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="achDept">Department</Label>
+            <Input id="achDept" value={form.department} onChange={e => update('department', e.target.value)} required />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="achSec">Section</Label>
+            <Input id="achSec" value={form.section} onChange={e => update('section', e.target.value)} required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="achDate">Date</Label>
+            <Input id="achDate" type="date" value={form.date} onChange={e => update('date', e.target.value)} required />
+          </div>
+        </div>
+
+        {/* OD Status */}
+        <div className="space-y-2">
+          <Label>OD Status</Label>
+          <Select value={form.status} onValueChange={v => update('status', v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="prize_winner_1">🥇 1st Prize Winner</SelectItem>
+              <SelectItem value="prize_winner_2">🥈 2nd Prize Winner</SelectItem>
+              <SelectItem value="prize_winner_3">🥉 3rd Prize Winner</SelectItem>
+              <SelectItem value="participant">📋 Participant</SelectItem>
+              <SelectItem value="volunteer">🤝 Volunteer</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Certificate Upload with mock OCR */}
+        <div className="space-y-2">
+          <Label>Certificate Upload (OCR Verified)</Label>
+          <label className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-5 cursor-pointer hover:border-primary/50 transition-colors bg-muted/30">
+            <Upload className="w-7 h-7 text-muted-foreground mb-2" />
+            <span className="text-sm text-muted-foreground">{certificate ? certificate.name : 'Upload certificate image'}</span>
+            <input type="file" accept="image/*" className="hidden" onChange={e => { if (e.target.files?.[0]) handleCertificateUpload(e.target.files[0]); }} />
+          </label>
+          {certVerifying && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" /> Verifying certificate via OCR...
+            </div>
+          )}
+          {certVerified && (
+            <div className="flex items-center gap-2 text-sm text-success">
+              <CheckCircle2 className="w-4 h-4" /> Certificate verified ✅
+            </div>
+          )}
+          {certificatePreview && (
+            <img src={certificatePreview} alt="Certificate preview" className="w-full max-h-40 object-contain rounded-lg border border-border mt-2" />
+          )}
+        </div>
+
+        {/* Photo Upload / Capture */}
+        <div className="space-y-3">
+          <Label>Photo Proof</Label>
+          <div className="flex gap-3">
+            <Button type="button" variant="outline" className="flex-1 gap-2" onClick={startCamera}>
+              <Camera className="w-4 h-4" /> Capture Photo
+            </Button>
+            <label className="flex-1">
+              <Button type="button" variant="outline" className="w-full gap-2" asChild>
+                <span>
+                  <Upload className="w-4 h-4" /> Upload Photo
+                </span>
+              </Button>
+              <input type="file" accept="image/*" className="hidden" onChange={e => { if (e.target.files?.[0]) handlePhotoUpload(e.target.files[0]); }} />
+            </label>
+          </div>
+
+          {/* Camera View */}
+          {showCamera && (
+            <div className="relative rounded-xl overflow-hidden border border-border">
+              <video ref={videoRef} autoPlay playsInline className="w-full max-h-60 object-cover" />
+              <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-3">
+                <Button type="button" size="sm" onClick={capturePhoto} className="gap-1">
+                  <Camera className="w-4 h-4" /> Capture
+                </Button>
+                <Button type="button" size="sm" variant="destructive" onClick={stopCamera}>Cancel</Button>
+              </div>
+            </div>
+          )}
+
+          {/* Photo Preview */}
+          {photoPreview && (
+            <div className="space-y-2">
+              <img src={photoPreview} alt="Photo preview" className="w-full max-h-48 object-contain rounded-xl border border-border" />
+              <p className="text-xs text-muted-foreground text-center">Photo uploaded ✅</p>
+            </div>
+          )}
+        </div>
+
+        {/* Location */}
+        <div className="space-y-2">
+          <Label>Live Location</Label>
+          <div className="bg-muted/30 rounded-xl p-4 border border-border">
+            {locationLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" /> Fetching location...
+              </div>
+            ) : location ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-success">
+                  <MapPin className="w-4 h-4" /> Location captured
+                </div>
+                <p className="text-xs text-muted-foreground">Lat: {location.lat.toFixed(6)}, Lng: {location.lng.toFixed(6)}</p>
+                <a
+                  href={`https://www.google.com/maps?q=${location.lat},${location.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline"
+                >
+                  View on Google Maps →
+                </a>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {locationError && <p className="text-sm text-destructive">{locationError}</p>}
+                <Button type="button" variant="outline" size="sm" onClick={fetchLocation} className="gap-2">
+                  <MapPin className="w-4 h-4" /> Get Location
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Verification Status */}
+        <div className={`rounded-xl p-4 border-2 text-center font-semibold text-sm ${
+          verificationStatus === 'ready'
+            ? 'bg-success/10 border-success/30 text-success'
+            : verificationStatus === 'incomplete'
+            ? 'bg-destructive/10 border-destructive/30 text-destructive'
+            : 'bg-muted/30 border-border text-muted-foreground'
+        }`}>
+          {verificationStatus === 'ready' && <span className="flex items-center justify-center gap-2"><CheckCircle2 className="w-5 h-5" /> Ready for verification ✅</span>}
+          {verificationStatus === 'incomplete' && <span className="flex items-center justify-center gap-2"><XCircle className="w-5 h-5" /> Incomplete ❌</span>}
+          {verificationStatus === 'idle' && <span>Upload photo and enable location to verify</span>}
+        </div>
+
+        <Button type="submit" className="w-full gradient-primary text-primary-foreground font-semibold" disabled={verificationStatus !== 'ready'}>
+          Submit Achievement
+        </Button>
       </form>
     </div>
   );
