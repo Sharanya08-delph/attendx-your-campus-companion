@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, LogOut, Home, FileText, Bell, Award, ChevronRight, AlertTriangle, ArrowLeft, Upload, Plus, Trash2, Camera, MapPin, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { User, LogOut, Home, FileText, Bell, Award, ChevronRight, AlertTriangle, ArrowLeft, Upload, Plus, Trash2, Camera, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -364,10 +364,6 @@ const AchievementForm = ({ onBack }: { onBack: () => void }) => {
   const [certificatePreview, setCertificatePreview] = useState<string | null>(null);
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [locationError, setLocationError] = useState('');
-  const [verificationStatus, setVerificationStatus] = useState<'idle' | 'ready' | 'incomplete'>('idle');
   const [certVerifying, setCertVerifying] = useState(false);
   const [certVerified, setCertVerified] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -376,51 +372,11 @@ const AchievementForm = ({ onBack }: { onBack: () => void }) => {
 
   const update = (key: string, value: string) => setForm(f => ({ ...f, [key]: value }));
 
-  // Get live location
-  const fetchLocation = () => {
-    setLocationLoading(true);
-    setLocationError('');
-    if (!navigator.geolocation) {
-      setLocationError('Geolocation not supported');
-      setLocationLoading(false);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocationLoading(false);
-        toast.success('Location fetched successfully');
-      },
-      (err) => {
-        setLocationError('Please enable location');
-        setLocationLoading(false);
-        toast.error('Please enable location');
-      },
-      { enableHighAccuracy: true }
-    );
-  };
-
-  useEffect(() => {
-    fetchLocation();
-  }, []);
-
-  // Update verification status
-  useEffect(() => {
-    if (photo && location) {
-      setVerificationStatus('ready');
-    } else if (photo || location) {
-      setVerificationStatus('incomplete');
-    } else {
-      setVerificationStatus('idle');
-    }
-  }, [photo, location]);
-
   // Handle certificate upload with mock OCR verification
   const handleCertificateUpload = (file: File) => {
     setCertificate(file);
     const url = URL.createObjectURL(file);
     setCertificatePreview(url);
-    // Mock OCR verification
     setCertVerifying(true);
     setCertVerified(false);
     setTimeout(() => {
@@ -476,16 +432,20 @@ const AchievementForm = ({ onBack }: { onBack: () => void }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!photo) {
-      toast.error('Please upload image');
-      return;
-    }
-    if (!location) {
-      toast.error('Please enable location');
+    if (!form.name.trim() || !form.regNo.trim() || !form.department.trim() || !form.section.trim() || !form.date) {
+      toast.error('Please fill all fields');
       return;
     }
     if (!form.status) {
       toast.error('Please select OD status');
+      return;
+    }
+    if (!certificate) {
+      toast.error('Please upload certificate');
+      return;
+    }
+    if (!photo) {
+      toast.error('Please upload photo proof');
       return;
     }
     addAchievement({
@@ -497,12 +457,12 @@ const AchievementForm = ({ onBack }: { onBack: () => void }) => {
       status: form.status as Achievement['status'],
       certificateUrl: certificatePreview || undefined,
       photoUrl: photoPreview || undefined,
-      latitude: location.lat,
-      longitude: location.lng,
     });
     toast.success('Achievement submitted successfully!');
     onBack();
   };
+
+  const isFormComplete = form.name.trim() && form.regNo.trim() && form.department.trim() && form.section.trim() && form.date && form.status && certificate && photo;
 
   return (
     <div className="space-y-6">
@@ -600,7 +560,6 @@ const AchievementForm = ({ onBack }: { onBack: () => void }) => {
             </label>
           </div>
 
-          {/* Camera View */}
           {showCamera && (
             <div className="relative rounded-xl overflow-hidden border border-border">
               <video ref={videoRef} autoPlay playsInline className="w-full max-h-60 object-cover" />
@@ -613,7 +572,6 @@ const AchievementForm = ({ onBack }: { onBack: () => void }) => {
             </div>
           )}
 
-          {/* Photo Preview */}
           {photoPreview && (
             <div className="space-y-2">
               <img src={photoPreview} alt="Photo preview" className="w-full max-h-48 object-contain rounded-xl border border-border" />
@@ -622,54 +580,19 @@ const AchievementForm = ({ onBack }: { onBack: () => void }) => {
           )}
         </div>
 
-        {/* Location */}
-        <div className="space-y-2">
-          <Label>Live Location</Label>
-          <div className="bg-muted/30 rounded-xl p-4 border border-border">
-            {locationLoading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" /> Fetching location...
-              </div>
-            ) : location ? (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-success">
-                  <MapPin className="w-4 h-4" /> Location captured
-                </div>
-                <p className="text-xs text-muted-foreground">Lat: {location.lat.toFixed(6)}, Lng: {location.lng.toFixed(6)}</p>
-                <a
-                  href={`https://www.google.com/maps?q=${location.lat},${location.lng}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline"
-                >
-                  View on Google Maps →
-                </a>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {locationError && <p className="text-sm text-destructive">{locationError}</p>}
-                <Button type="button" variant="outline" size="sm" onClick={fetchLocation} className="gap-2">
-                  <MapPin className="w-4 h-4" /> Get Location
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* Verification Status */}
         <div className={`rounded-xl p-4 border-2 text-center font-semibold text-sm ${
-          verificationStatus === 'ready'
+          isFormComplete
             ? 'bg-success/10 border-success/30 text-success'
-            : verificationStatus === 'incomplete'
-            ? 'bg-destructive/10 border-destructive/30 text-destructive'
-            : 'bg-muted/30 border-border text-muted-foreground'
+            : 'bg-destructive/10 border-destructive/30 text-destructive'
         }`}>
-          {verificationStatus === 'ready' && <span className="flex items-center justify-center gap-2"><CheckCircle2 className="w-5 h-5" /> Ready for verification ✅</span>}
-          {verificationStatus === 'incomplete' && <span className="flex items-center justify-center gap-2"><XCircle className="w-5 h-5" /> Incomplete ❌</span>}
-          {verificationStatus === 'idle' && <span>Upload photo and enable location to verify</span>}
+          {isFormComplete
+            ? <span className="flex items-center justify-center gap-2"><CheckCircle2 className="w-5 h-5" /> Ready for verification ✅</span>
+            : <span className="flex items-center justify-center gap-2"><XCircle className="w-5 h-5" /> Incomplete ❌ — Fill all fields</span>
+          }
         </div>
 
-        <Button type="submit" className="w-full gradient-primary text-primary-foreground font-semibold" disabled={verificationStatus !== 'ready'}>
+        <Button type="submit" className="w-full gradient-primary text-primary-foreground font-semibold" disabled={!isFormComplete}>
           Submit Achievement
         </Button>
       </form>
