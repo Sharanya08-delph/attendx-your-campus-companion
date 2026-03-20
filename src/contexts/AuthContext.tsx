@@ -194,7 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const newAchievement: Achievement = {
       ...achievement,
       id: crypto.randomUUID(),
-      verified: !!(achievement.photoUrl && achievement.latitude),
+      verified: !!achievement.photoUrl,
       submittedAt: new Date().toISOString(),
     };
     const updated = { ...studentData, achievements: [...studentData.achievements, newAchievement] };
