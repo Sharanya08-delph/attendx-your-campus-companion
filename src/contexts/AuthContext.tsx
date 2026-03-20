@@ -2,6 +2,22 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export type UserRole = 'student' | 'faculty' | 'admin';
 
+export interface Achievement {
+  id: string;
+  name: string;
+  regNo: string;
+  department: string;
+  section: string;
+  date: string;
+  status: 'prize_winner_1' | 'prize_winner_2' | 'prize_winner_3' | 'participant' | 'volunteer';
+  certificateUrl?: string;
+  photoUrl?: string;
+  latitude?: number;
+  longitude?: number;
+  verified: boolean;
+  submittedAt: string;
+}
+
 export interface StudentData {
   name: string;
   department: string;
@@ -10,7 +26,7 @@ export interface StudentData {
   email: string;
   phone: string;
   attendance: number;
-  achievements: string[];
+  achievements: Achievement[];
   odApplications: ODApplication[];
 }
 
@@ -48,6 +64,7 @@ interface AuthContextType {
   registerFaculty: (data: FacultyData & { password: string }) => boolean;
   logout: () => void;
   addODApplication: (od: Omit<ODApplication, 'id' | 'status' | 'submittedAt'>) => void;
+  addAchievement: (achievement: Omit<Achievement, 'id' | 'verified' | 'submittedAt'>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
