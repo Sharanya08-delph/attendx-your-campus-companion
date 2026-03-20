@@ -181,7 +181,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = { ...studentData, odApplications: [...studentData.odApplications, newOD] };
     setStudentData(updated);
     saveSession('student', updated);
-    // Also update localStorage
     const students = JSON.parse(localStorage.getItem('attendx_students') || '[]');
     const idx = students.findIndex((s: any) => s.email === studentData.email);
     if (idx >= 0) {
@@ -190,8 +189,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const addAchievement = (achievement: Omit<Achievement, 'id' | 'verified' | 'submittedAt'>) => {
+    if (!studentData) return;
+    const newAchievement: Achievement = {
+      ...achievement,
+      id: crypto.randomUUID(),
+      verified: !!(achievement.photoUrl && achievement.latitude),
+      submittedAt: new Date().toISOString(),
+    };
+    const updated = { ...studentData, achievements: [...studentData.achievements, newAchievement] };
+    setStudentData(updated);
+    saveSession('student', updated);
+    const students = JSON.parse(localStorage.getItem('attendx_students') || '[]');
+    const idx = students.findIndex((s: any) => s.email === studentData.email);
+    if (idx >= 0) {
+      students[idx] = { ...students[idx], achievements: updated.achievements };
+      localStorage.setItem('attendx_students', JSON.stringify(students));
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, role, studentData, facultyData, login, registerStudent, registerFaculty, logout, addODApplication }}>
+    <AuthContext.Provider value={{ isAuthenticated, role, studentData, facultyData, login, registerStudent, registerFaculty, logout, addODApplication, addAchievement }}>
       {children}
     </AuthContext.Provider>
   );
