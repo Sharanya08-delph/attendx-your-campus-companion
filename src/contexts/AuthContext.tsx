@@ -2,6 +2,22 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 export type UserRole = 'student' | 'faculty' | 'admin';
 
+export interface Achievement {
+  id: string;
+  name: string;
+  regNo: string;
+  department: string;
+  section: string;
+  date: string;
+  status: 'prize_winner_1' | 'prize_winner_2' | 'prize_winner_3' | 'participant' | 'volunteer';
+  certificateUrl?: string;
+  photoUrl?: string;
+  latitude?: number;
+  longitude?: number;
+  verified: boolean;
+  submittedAt: string;
+}
+
 export interface StudentData {
   name: string;
   department: string;
@@ -10,7 +26,7 @@ export interface StudentData {
   email: string;
   phone: string;
   attendance: number;
-  achievements: string[];
+  achievements: Achievement[];
   odApplications: ODApplication[];
 }
 
@@ -48,6 +64,7 @@ interface AuthContextType {
   registerFaculty: (data: FacultyData & { password: string }) => boolean;
   logout: () => void;
   addODApplication: (od: Omit<ODApplication, 'id' | 'status' | 'submittedAt'>) => void;
+  addAchievement: (achievement: Omit<Achievement, 'id' | 'verified' | 'submittedAt'>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -164,7 +181,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = { ...studentData, odApplications: [...studentData.odApplications, newOD] };
     setStudentData(updated);
     saveSession('student', updated);
-    // Also update localStorage
     const students = JSON.parse(localStorage.getItem('attendx_students') || '[]');
     const idx = students.findIndex((s: any) => s.email === studentData.email);
     if (idx >= 0) {
@@ -173,8 +189,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const addAchievement = (achievement: Omit<Achievement, 'id' | 'verified' | 'submittedAt'>) => {
+    if (!studentData) return;
+    const newAchievement: Achievement = {
+      ...achievement,
+      id: crypto.randomUUID(),
+      verified: !!(achievement.photoUrl && achievement.latitude),
+      submittedAt: new Date().toISOString(),
+    };
+    const updated = { ...studentData, achievements: [...studentData.achievements, newAchievement] };
+    setStudentData(updated);
+    saveSession('student', updated);
+    const students = JSON.parse(localStorage.getItem('attendx_students') || '[]');
+    const idx = students.findIndex((s: any) => s.email === studentData.email);
+    if (idx >= 0) {
+      students[idx] = { ...students[idx], achievements: updated.achievements };
+      localStorage.setItem('attendx_students', JSON.stringify(students));
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, role, studentData, facultyData, login, registerStudent, registerFaculty, logout, addODApplication }}>
+    <AuthContext.Provider value={{ isAuthenticated, role, studentData, facultyData, login, registerStudent, registerFaculty, logout, addODApplication, addAchievement }}>
       {children}
     </AuthContext.Provider>
   );
