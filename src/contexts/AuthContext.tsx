@@ -12,8 +12,6 @@ export interface Achievement {
   status: 'prize_winner_1' | 'prize_winner_2' | 'prize_winner_3' | 'participant' | 'volunteer';
   certificateUrl?: string;
   photoUrl?: string;
-  latitude?: number;
-  longitude?: number;
   verified: boolean;
   submittedAt: string;
 }
@@ -34,6 +32,8 @@ export interface FacultyData {
   name: string;
   email: string;
   phone: string;
+  department: string;
+  isHOD: boolean;
 }
 
 export interface TeamMember {
@@ -52,6 +52,19 @@ export interface ODApplication {
   proofUrl?: string;
   status: 'pending' | 'approved' | 'rejected';
   submittedAt: string;
+  studentEmail?: string;
+  studentName?: string;
+}
+
+export interface AttendanceRecord {
+  id: string;
+  date: string;
+  department: string;
+  section: string;
+  period: string;
+  records: { regNo: string; name: string; present: boolean }[];
+  savedBy: string;
+  savedAt: string;
 }
 
 interface AuthContextType {
@@ -65,6 +78,12 @@ interface AuthContextType {
   logout: () => void;
   addODApplication: (od: Omit<ODApplication, 'id' | 'status' | 'submittedAt'>) => void;
   addAchievement: (achievement: Omit<Achievement, 'id' | 'verified' | 'submittedAt'>) => void;
+  saveAttendance: (record: Omit<AttendanceRecord, 'id' | 'savedAt'>) => void;
+  getAttendanceRecords: (department: string, section: string) => AttendanceRecord[];
+  getAllStudents: () => StudentData[];
+  getAllFaculty: () => FacultyData[];
+  getAllODApplications: () => ODApplication[];
+  updateODStatus: (id: string, status: 'approved' | 'rejected') => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -177,6 +196,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: crypto.randomUUID(),
       status: 'pending',
       submittedAt: new Date().toISOString(),
+      studentEmail: studentData.email,
+      studentName: studentData.name,
     };
     const updated = { ...studentData, odApplications: [...studentData.odApplications, newOD] };
     setStudentData(updated);
@@ -187,6 +208,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       students[idx] = { ...students[idx], odApplications: updated.odApplications };
       localStorage.setItem('attendx_students', JSON.stringify(students));
     }
+    // Also save to global OD list
+    const allODs = JSON.parse(localStorage.getItem('attendx_all_ods') || '[]');
+    allODs.push(newOD);
+    localStorage.setItem('attendx_all_ods', JSON.stringify(allODs));
   };
 
   const addAchievement = (achievement: Omit<Achievement, 'id' | 'verified' | 'submittedAt'>) => {
@@ -208,8 +233,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const saveAttendance = (record: Omit<AttendanceRecord, 'id' | 'savedAt'>) => {
+    const newRecord: AttendanceRecord = {
+      ...record,
+      id: crypto.randomUUID(),
+      savedAt: new Date().toISOString(),
+    };
+    const records = JSON.parse(localStorage.getItem('attendx_attendance') || '[]');
+    records.push(newRecord);
+    localStorage.setItem('attendx_attendance', JSON.stringify(records));
+  };
+
+  const getAttendanceRecords = (department: string, section: string) => {
+    const records: AttendanceRecord[] = JSON.parse(localStorage.getItem('attendx_attendance') || '[]');
+    return records.filter(r => r.department === department && r.section === section);
+  };
+
+  const getAllStudents = (): StudentData[] => {
+    const students = JSON.parse(localStorage.getItem('attendx_students') || '[]');
+    return students.map(({ password, ...rest }: any) => rest);
+  };
+
+  const getAllFaculty = (): FacultyData[] => {
+    const faculty = JSON.parse(localStorage.getItem('attendx_faculty') || '[]');
+    return faculty.map(({ password, ...rest }: any) => rest);
+  };
+
+  const getAllODApplications = (): ODApplication[] => {
+    return JSON.parse(localStorage.getItem('attendx_all_ods') || '[]');
+  };
+
+  const updateODStatus = (id: string, status: 'approved' | 'rejected') => {
+    const allODs: ODApplication[] = JSON.parse(localStorage.getItem('attendx_all_ods') || '[]');
+    const updatedODs = allODs.map(od => od.id === id ? { ...od, status } : od);
+    localStorage.setItem('attendx_all_ods', JSON.stringify(updatedODs));
+
+    // Update in student records too
+    const students = JSON.parse(localStorage.getItem('attendx_students') || '[]');
+    students.forEach((s: any, i: number) => {
+      if (s.odApplications) {
+        s.odApplications = s.odApplications.map((od: any) => od.id === id ? { ...od, status } : od);
+      }
+      students[i] = s;
+    });
+    localStorage.setItem('attendx_students', JSON.stringify(students));
+  };
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, role, studentData, facultyData, login, registerStudent, registerFaculty, logout, addODApplication, addAchievement }}>
+    <AuthContext.Provider value={{
+      isAuthenticated, role, studentData, facultyData,
+      login, registerStudent, registerFaculty, logout,
+      addODApplication, addAchievement,
+      saveAttendance, getAttendanceRecords,
+      getAllStudents, getAllFaculty, getAllODApplications, updateODStatus,
+    }}>
       {children}
     </AuthContext.Provider>
   );
