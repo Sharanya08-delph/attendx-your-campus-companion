@@ -499,7 +499,7 @@ const AchievementForm = ({ onBack }: { onBack: () => void }) => {
           </div>
           <div className="space-y-2">
             <Label htmlFor="achDate">Date</Label>
-            <Input id="achDate" type="date" value={form.date} onChange={e => update('date', e.target.value)} required />
+            <Input id="achDate" type="date" value={form.date} onChange={e => update('date', e.target.value)} max={new Date().toISOString().split('T')[0]} required />
           </div>
         </div>
 

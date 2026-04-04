@@ -28,7 +28,7 @@ const ForgotPassword = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email Address</Label>
-            <Input id="email" type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)} required />
+            <Input id="email" type="email" placeholder="Enter mail id" value={email} onChange={e => setEmail(e.target.value)} required />
           </div>
           <Button type="submit" className="w-full gradient-primary text-primary-foreground font-semibold">Send Reset Link</Button>
         </form>
