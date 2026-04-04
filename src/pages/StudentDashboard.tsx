@@ -294,7 +294,7 @@ const ODApplicationForm = ({ onBack }: { onBack: () => void }) => {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="date">Date</Label>
-            <Input id="date" type="date" value={form.date} onChange={e => update('date', e.target.value)} required />
+            <Input id="date" type="date" value={form.date} onChange={e => update('date', e.target.value)} min={new Date().toISOString().split('T')[0]} required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="time">Time</Label>
@@ -499,7 +499,7 @@ const AchievementForm = ({ onBack }: { onBack: () => void }) => {
           </div>
           <div className="space-y-2">
             <Label htmlFor="achDate">Date</Label>
-            <Input id="achDate" type="date" value={form.date} onChange={e => update('date', e.target.value)} required />
+            <Input id="achDate" type="date" value={form.date} onChange={e => update('date', e.target.value)} max={new Date().toISOString().split('T')[0]} required />
           </div>
         </div>
 
