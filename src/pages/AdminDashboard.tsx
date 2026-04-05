@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -90,9 +90,15 @@ const AdminDashboard = () => {
 /* ── Overview ── */
 const OverviewTab = () => {
   const { getAllStudents, getAllFaculty, getAllODApplications } = useAuth();
-  const students = getAllStudents();
-  const faculty = getAllFaculty();
-  const ods = getAllODApplications();
+  const [students, setStudents] = useState<StudentData[]>([]);
+  const [faculty, setFaculty] = useState<FacultyData[]>([]);
+  const [ods, setOds] = useState<ODApplication[]>([]);
+
+  useEffect(() => {
+    getAllStudents().then(setStudents);
+    getAllFaculty().then(setFaculty);
+    getAllODApplications().then(setOds);
+  }, []);
 
   const stats = [
     { label: 'Total Students', value: students.length, icon: Users, color: 'text-primary' },
@@ -149,8 +155,10 @@ const OverviewTab = () => {
 /* ── Students Tab ── */
 const StudentsTab = () => {
   const { getAllStudents } = useAuth();
-  const students = getAllStudents();
+  const [students, setStudents] = useState<StudentData[]>([]);
   const [search, setSearch] = useState('');
+
+  useEffect(() => { getAllStudents().then(setStudents); }, []);
 
   const filtered = students.filter(s =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -211,8 +219,10 @@ const StudentsTab = () => {
 /* ── Faculty Tab ── */
 const FacultyTab = () => {
   const { getAllFaculty } = useAuth();
-  const faculty = getAllFaculty();
+  const [faculty, setFaculty] = useState<FacultyData[]>([]);
   const [search, setSearch] = useState('');
+
+  useEffect(() => { getAllFaculty().then(setFaculty); }, []);
 
   const filtered = faculty.filter(f =>
     f.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -265,7 +275,9 @@ const FacultyTab = () => {
 /* ── Admin OD Requests ── */
 const AdminODTab = () => {
   const { getAllODApplications, updateODStatus } = useAuth();
-  const [odList, setOdList] = useState<ODApplication[]>(getAllODApplications());
+  const [odList, setOdList] = useState<ODApplication[]>([]);
+
+  useEffect(() => { getAllODApplications().then(setOdList); }, []);
 
   const handleAction = (id: string, status: 'approved' | 'rejected') => {
     updateODStatus(id, status);

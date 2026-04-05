@@ -13,12 +13,13 @@ const sections = ['A', 'B', 'C', 'D'];
 
 const StudentRegister = () => {
   const [form, setForm] = useState({ name: '', department: '', section: '', regNo: '', email: '', phone: '', password: '', confirmPassword: '' });
+  const [loading, setLoading] = useState(false);
   const { registerStudent } = useAuth();
   const navigate = useNavigate();
 
   const update = (key: string, value: string) => setForm(f => ({ ...f, [key]: value }));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.email.endsWith('.ritchennai.edu.in')) {
       toast.error('Use only college mail ID');
@@ -36,8 +37,11 @@ const StudentRegister = () => {
       toast.error('Please enter a valid 10-digit phone number');
       return;
     }
+    setLoading(true);
     const { confirmPassword, ...data } = form;
-    if (registerStudent(data)) {
+    const ok = await registerStudent(data);
+    setLoading(false);
+    if (ok) {
       toast.success('Account created successfully!');
       navigate('/student/dashboard');
     } else {
@@ -94,8 +98,8 @@ const StudentRegister = () => {
             <Input id="confirmPassword" type="password" placeholder="••••••" value={form.confirmPassword} onChange={e => update('confirmPassword', e.target.value)} required />
           </div>
         </div>
-        <Button type="submit" className="w-full gradient-primary text-primary-foreground font-semibold mt-2">
-          Create Account
+        <Button type="submit" className="w-full gradient-primary text-primary-foreground font-semibold mt-2" disabled={loading}>
+          {loading ? 'Creating...' : 'Create Account'}
         </Button>
         <p className="text-center text-sm text-muted-foreground">
           Already registered? <Link to="/student/login" className="text-primary font-semibold hover:underline">Sign In</Link>
