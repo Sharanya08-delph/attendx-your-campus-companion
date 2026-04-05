@@ -13,15 +13,26 @@ import type { TeamMember, Achievement } from '@/contexts/AuthContext';
 type Tab = 'home' | 'od' | 'achievement' | 'profile';
 
 const StudentDashboard = () => {
-  const { studentData, logout } = useAuth();
+  const { studentData, logout, loading } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [showProfile, setShowProfile] = useState(false);
 
-  if (!studentData) {
-    navigate('/student/login');
-    return null;
+  useEffect(() => {
+    if (!loading && !studentData) {
+      navigate('/student/login');
+    }
+  }, [loading, studentData, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
   }
+
+  if (!studentData) return null;
 
   const attendanceColor = studentData.attendance >= 75 ? 'text-success' : 'text-destructive';
   const attendanceBg = studentData.attendance >= 75 ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30';
