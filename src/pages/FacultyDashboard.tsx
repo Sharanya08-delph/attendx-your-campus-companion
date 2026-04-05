@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -200,9 +200,10 @@ const AttendanceTab = () => {
     setStudents([]);
   };
 
-  const loadRecords = () => {
+  const loadRecords = async () => {
     if (!department || !section) { toast.error('Select department and section'); return; }
-    setViewRecords(getAttendanceRecords(department, section));
+    const records = await getAttendanceRecords(department, section);
+    setViewRecords(records);
   };
 
   return (
@@ -345,7 +346,9 @@ const AttendanceTab = () => {
 /* ── OD Requests Tab (HOD Only) ── */
 const ODRequestsTab = () => {
   const { getAllODApplications, updateODStatus } = useAuth();
-  const [odList, setOdList] = useState<ODApplication[]>(getAllODApplications());
+  const [odList, setOdList] = useState<ODApplication[]>([]);
+
+  useEffect(() => { getAllODApplications().then(setOdList); }, []);
 
   const handleAction = (id: string, status: 'approved' | 'rejected') => {
     updateODStatus(id, status);
