@@ -1,4 +1,22 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { signUp, signIn, logOut, onAuthChange } from '@/lib/auth';
+import {
+  createUser,
+  getUser,
+  getUsersByRole,
+  getAllUsers as fetchAllUsers,
+  saveAttendanceRecord,
+  getAttendanceRecords as fetchAttendanceRecords,
+  addODApplication as fireAddOD,
+  getAllODApplications as fireGetAllODs,
+  updateODStatus as fireUpdateODStatus,
+  addAchievementDoc,
+  getAchievementsByStudent,
+  type FirestoreUser,
+  type AttendanceDoc,
+  type ODDoc,
+  type AchievementDoc,
+} from '@/lib/firestore';
 
 export type UserRole = 'student' | 'faculty' | 'admin';
 
@@ -17,6 +35,7 @@ export interface Achievement {
 }
 
 export interface StudentData {
+  uid: string;
   name: string;
   department: string;
   section: string;
@@ -29,6 +48,7 @@ export interface StudentData {
 }
 
 export interface FacultyData {
+  uid: string;
   name: string;
   email: string;
   phone: string;
@@ -72,18 +92,19 @@ interface AuthContextType {
   role: UserRole | null;
   studentData: StudentData | null;
   facultyData: FacultyData | null;
-  login: (role: UserRole, email: string, password: string) => boolean;
-  registerStudent: (data: Omit<StudentData, 'attendance' | 'achievements' | 'odApplications'> & { password: string }) => boolean;
-  registerFaculty: (data: FacultyData & { password: string }) => boolean;
-  logout: () => void;
-  addODApplication: (od: Omit<ODApplication, 'id' | 'status' | 'submittedAt'>) => void;
-  addAchievement: (achievement: Omit<Achievement, 'id' | 'verified' | 'submittedAt'>) => void;
-  saveAttendance: (record: Omit<AttendanceRecord, 'id' | 'savedAt'>) => void;
-  getAttendanceRecords: (department: string, section: string) => AttendanceRecord[];
-  getAllStudents: () => StudentData[];
-  getAllFaculty: () => FacultyData[];
-  getAllODApplications: () => ODApplication[];
-  updateODStatus: (id: string, status: 'approved' | 'rejected') => void;
+  loading: boolean;
+  login: (role: UserRole, email: string, password: string) => Promise<boolean>;
+  registerStudent: (data: Omit<StudentData, 'uid' | 'attendance' | 'achievements' | 'odApplications'> & { password: string }) => Promise<boolean>;
+  registerFaculty: (data: Omit<FacultyData, 'uid'> & { password: string }) => Promise<boolean>;
+  logout: () => Promise<void>;
+  addODApplication: (od: Omit<ODApplication, 'id' | 'status' | 'submittedAt'>) => Promise<void>;
+  addAchievement: (achievement: Omit<Achievement, 'id' | 'verified' | 'submittedAt'>) => Promise<void>;
+  saveAttendance: (record: Omit<AttendanceRecord, 'id' | 'savedAt'>) => Promise<void>;
+  getAttendanceRecords: (department: string, section: string) => Promise<AttendanceRecord[]>;
+  getAllStudents: () => Promise<StudentData[]>;
+  getAllFaculty: () => Promise<FacultyData[]>;
+  getAllODApplications: () => Promise<ODApplication[]>;
+  updateODStatus: (id: string, status: 'approved' | 'rejected') => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -94,198 +115,212 @@ export const useAuth = () => {
   return ctx;
 };
 
+const ADMIN_EMAIL = 'ritadmin@gmail.com';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [role, setRole] = useState<UserRole | null>(null);
   const [studentData, setStudentData] = useState<StudentData | null>(null);
   const [facultyData, setFacultyData] = useState<FacultyData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [currentUid, setCurrentUid] = useState<string | null>(null);
 
+  // Listen to Firebase auth state
   useEffect(() => {
-    const saved = localStorage.getItem('attendx_session');
-    if (saved) {
-      const session = JSON.parse(saved);
-      setIsAuthenticated(true);
-      setRole(session.role);
-      if (session.role === 'student') setStudentData(session.data);
-      if (session.role === 'faculty') setFacultyData(session.data);
-    }
+    const unsub = onAuthChange(async (user) => {
+      if (user) {
+        setCurrentUid(user.uid);
+        const fsUser = await getUser(user.uid);
+        if (fsUser) {
+          setIsAuthenticated(true);
+          setRole(fsUser.role);
+          if (fsUser.role === 'student') {
+            const achievements = await getAchievementsByStudent(user.uid);
+            const allODs = await fireGetAllODs();
+            const myODs = allODs.filter(od => od.studentUid === user.uid);
+            setStudentData({
+              uid: fsUser.uid,
+              name: fsUser.name,
+              department: fsUser.department,
+              section: fsUser.section || '',
+              regNo: fsUser.regNo || '',
+              email: fsUser.email,
+              phone: fsUser.phone,
+              attendance: Math.floor(Math.random() * 30) + 65,
+              achievements: achievements.map(a => ({ ...a, id: a.id! })),
+              odApplications: myODs.map(od => ({ ...od, id: od.id! })),
+            });
+          } else if (fsUser.role === 'faculty') {
+            setFacultyData({
+              uid: fsUser.uid,
+              name: fsUser.name,
+              email: fsUser.email,
+              phone: fsUser.phone,
+              department: fsUser.department,
+              isHOD: fsUser.isHOD || false,
+            });
+          }
+          // admin has no extra data
+        } else if (user.email === ADMIN_EMAIL) {
+          setIsAuthenticated(true);
+          setRole('admin');
+        }
+      } else {
+        setIsAuthenticated(false);
+        setRole(null);
+        setStudentData(null);
+        setFacultyData(null);
+        setCurrentUid(null);
+      }
+      setLoading(false);
+    });
+    return unsub;
   }, []);
 
-  const saveSession = (r: UserRole, data: any) => {
-    localStorage.setItem('attendx_session', JSON.stringify({ role: r, data }));
-  };
-
-  const registerStudent = (data: Omit<StudentData, 'attendance' | 'achievements' | 'odApplications'> & { password: string }) => {
-    const { password, ...rest } = data;
-    const students = JSON.parse(localStorage.getItem('attendx_students') || '[]');
-    if (students.find((s: any) => s.email === data.email)) return false;
-    const student: StudentData = { ...rest, attendance: Math.floor(Math.random() * 30) + 65, achievements: [], odApplications: [] };
-    students.push({ ...student, password });
-    localStorage.setItem('attendx_students', JSON.stringify(students));
-    setStudentData(student);
-    setRole('student');
-    setIsAuthenticated(true);
-    saveSession('student', student);
-    return true;
-  };
-
-  const registerFaculty = (data: FacultyData & { password: string }) => {
-    const { password, ...rest } = data;
-    const faculty = JSON.parse(localStorage.getItem('attendx_faculty') || '[]');
-    if (faculty.find((f: any) => f.email === data.email)) return false;
-    faculty.push({ ...rest, password });
-    localStorage.setItem('attendx_faculty', JSON.stringify(faculty));
-    setFacultyData(rest);
-    setRole('faculty');
-    setIsAuthenticated(true);
-    saveSession('faculty', rest);
-    return true;
-  };
-
-  const login = (r: UserRole, email: string, password: string) => {
-    if (r === 'admin') {
-      if (email === 'ritadmin@gmail.com' && password === 'rit123') {
-        setRole('admin');
-        setIsAuthenticated(true);
-        saveSession('admin', { email });
-        return true;
-      }
+  const registerStudent = async (data: Omit<StudentData, 'uid' | 'attendance' | 'achievements' | 'odApplications'> & { password: string }): Promise<boolean> => {
+    try {
+      const { password, ...rest } = data;
+      const cred = await signUp(data.email, password);
+      await createUser({
+        uid: cred.user.uid,
+        name: rest.name,
+        email: rest.email,
+        regNo: rest.regNo,
+        department: rest.department,
+        section: rest.section,
+        phone: rest.phone,
+        role: 'student',
+      });
+      return true;
+    } catch (e: any) {
+      console.error('Register student error:', e);
       return false;
     }
-    if (r === 'student') {
-      const students = JSON.parse(localStorage.getItem('attendx_students') || '[]');
-      const found = students.find((s: any) => s.email === email && s.password === password);
-      if (found) {
-        const { password: _, ...data } = found;
-        setStudentData(data);
-        setRole('student');
-        setIsAuthenticated(true);
-        saveSession('student', data);
-        return true;
-      }
-      return false;
-    }
-    if (r === 'faculty') {
-      const faculty = JSON.parse(localStorage.getItem('attendx_faculty') || '[]');
-      const found = faculty.find((f: any) => f.email === email && f.password === password);
-      if (found) {
-        const { password: _, ...data } = found;
-        setFacultyData(data);
-        setRole('faculty');
-        setIsAuthenticated(true);
-        saveSession('faculty', data);
-        return true;
-      }
-      return false;
-    }
-    return false;
   };
 
-  const logout = () => {
-    setIsAuthenticated(false);
-    setRole(null);
-    setStudentData(null);
-    setFacultyData(null);
-    localStorage.removeItem('attendx_session');
+  const registerFaculty = async (data: Omit<FacultyData, 'uid'> & { password: string }): Promise<boolean> => {
+    try {
+      const { password, ...rest } = data;
+      const cred = await signUp(data.email, password);
+      await createUser({
+        uid: cred.user.uid,
+        name: rest.name,
+        email: rest.email,
+        department: rest.department,
+        phone: rest.phone,
+        role: 'faculty',
+        isHOD: rest.isHOD,
+      });
+      return true;
+    } catch (e: any) {
+      console.error('Register faculty error:', e);
+      return false;
+    }
   };
 
-  const addODApplication = (od: Omit<ODApplication, 'id' | 'status' | 'submittedAt'>) => {
-    if (!studentData) return;
+  const login = async (r: UserRole, email: string, password: string): Promise<boolean> => {
+    try {
+      await signIn(email, password);
+      // onAuthChange will handle setting state
+      return true;
+    } catch (e: any) {
+      console.error('Login error:', e);
+      return false;
+    }
+  };
+
+  const logout = async () => {
+    await logOut();
+  };
+
+  const addODApplication = async (od: Omit<ODApplication, 'id' | 'status' | 'submittedAt'>) => {
+    if (!studentData || !currentUid) return;
+    const id = await fireAddOD({
+      ...od,
+      studentEmail: studentData.email,
+      studentName: studentData.name,
+      studentUid: currentUid,
+    });
     const newOD: ODApplication = {
       ...od,
-      id: crypto.randomUUID(),
+      id,
       status: 'pending',
       submittedAt: new Date().toISOString(),
       studentEmail: studentData.email,
       studentName: studentData.name,
     };
-    const updated = { ...studentData, odApplications: [...studentData.odApplications, newOD] };
-    setStudentData(updated);
-    saveSession('student', updated);
-    const students = JSON.parse(localStorage.getItem('attendx_students') || '[]');
-    const idx = students.findIndex((s: any) => s.email === studentData.email);
-    if (idx >= 0) {
-      students[idx] = { ...students[idx], odApplications: updated.odApplications };
-      localStorage.setItem('attendx_students', JSON.stringify(students));
-    }
-    // Also save to global OD list
-    const allODs = JSON.parse(localStorage.getItem('attendx_all_ods') || '[]');
-    allODs.push(newOD);
-    localStorage.setItem('attendx_all_ods', JSON.stringify(allODs));
+    setStudentData(prev => prev ? { ...prev, odApplications: [...prev.odApplications, newOD] } : prev);
   };
 
-  const addAchievement = (achievement: Omit<Achievement, 'id' | 'verified' | 'submittedAt'>) => {
-    if (!studentData) return;
-    const newAchievement: Achievement = {
+  const addAchievement = async (achievement: Omit<Achievement, 'id' | 'verified' | 'submittedAt'>) => {
+    if (!studentData || !currentUid) return;
+    const id = await addAchievementDoc({
       ...achievement,
-      id: crypto.randomUUID(),
+      verified: !!achievement.photoUrl,
+      studentUid: currentUid,
+    });
+    const newA: Achievement = {
+      ...achievement,
+      id,
       verified: !!achievement.photoUrl,
       submittedAt: new Date().toISOString(),
     };
-    const updated = { ...studentData, achievements: [...studentData.achievements, newAchievement] };
-    setStudentData(updated);
-    saveSession('student', updated);
-    const students = JSON.parse(localStorage.getItem('attendx_students') || '[]');
-    const idx = students.findIndex((s: any) => s.email === studentData.email);
-    if (idx >= 0) {
-      students[idx] = { ...students[idx], achievements: updated.achievements };
-      localStorage.setItem('attendx_students', JSON.stringify(students));
-    }
+    setStudentData(prev => prev ? { ...prev, achievements: [...prev.achievements, newA] } : prev);
   };
 
-  const saveAttendance = (record: Omit<AttendanceRecord, 'id' | 'savedAt'>) => {
-    const newRecord: AttendanceRecord = {
-      ...record,
-      id: crypto.randomUUID(),
-      savedAt: new Date().toISOString(),
-    };
-    const records = JSON.parse(localStorage.getItem('attendx_attendance') || '[]');
-    records.push(newRecord);
-    localStorage.setItem('attendx_attendance', JSON.stringify(records));
+  const saveAttendance = async (record: Omit<AttendanceRecord, 'id' | 'savedAt'>) => {
+    await saveAttendanceRecord(record);
   };
 
-  const getAttendanceRecords = (department: string, section: string) => {
-    const records: AttendanceRecord[] = JSON.parse(localStorage.getItem('attendx_attendance') || '[]');
-    return records.filter(r => r.department === department && r.section === section);
+  const getAttendanceRecordsFn = async (department: string, section: string): Promise<AttendanceRecord[]> => {
+    const docs = await fetchAttendanceRecords(department, section);
+    return docs.map(d => ({ ...d, id: d.id! }));
   };
 
-  const getAllStudents = (): StudentData[] => {
-    const students = JSON.parse(localStorage.getItem('attendx_students') || '[]');
-    return students.map(({ password, ...rest }: any) => rest);
+  const getAllStudents = async (): Promise<StudentData[]> => {
+    const users = await getUsersByRole('student');
+    return users.map(u => ({
+      uid: u.uid,
+      name: u.name,
+      department: u.department,
+      section: u.section || '',
+      regNo: u.regNo || '',
+      email: u.email,
+      phone: u.phone,
+      attendance: Math.floor(Math.random() * 30) + 65,
+      achievements: [],
+      odApplications: [],
+    }));
   };
 
-  const getAllFaculty = (): FacultyData[] => {
-    const faculty = JSON.parse(localStorage.getItem('attendx_faculty') || '[]');
-    return faculty.map(({ password, ...rest }: any) => rest);
+  const getAllFaculty = async (): Promise<FacultyData[]> => {
+    const users = await getUsersByRole('faculty');
+    return users.map(u => ({
+      uid: u.uid,
+      name: u.name,
+      email: u.email,
+      phone: u.phone,
+      department: u.department,
+      isHOD: u.isHOD || false,
+    }));
   };
 
-  const getAllODApplications = (): ODApplication[] => {
-    return JSON.parse(localStorage.getItem('attendx_all_ods') || '[]');
+  const getAllODApplications = async (): Promise<ODApplication[]> => {
+    const docs = await fireGetAllODs();
+    return docs.map(d => ({ ...d, id: d.id! }));
   };
 
-  const updateODStatus = (id: string, status: 'approved' | 'rejected') => {
-    const allODs: ODApplication[] = JSON.parse(localStorage.getItem('attendx_all_ods') || '[]');
-    const updatedODs = allODs.map(od => od.id === id ? { ...od, status } : od);
-    localStorage.setItem('attendx_all_ods', JSON.stringify(updatedODs));
-
-    // Update in student records too
-    const students = JSON.parse(localStorage.getItem('attendx_students') || '[]');
-    students.forEach((s: any, i: number) => {
-      if (s.odApplications) {
-        s.odApplications = s.odApplications.map((od: any) => od.id === id ? { ...od, status } : od);
-      }
-      students[i] = s;
-    });
-    localStorage.setItem('attendx_students', JSON.stringify(students));
+  const updateODStatusFn = async (id: string, status: 'approved' | 'rejected') => {
+    await fireUpdateODStatus(id, status);
   };
 
   return (
     <AuthContext.Provider value={{
-      isAuthenticated, role, studentData, facultyData,
+      isAuthenticated, role, studentData, facultyData, loading,
       login, registerStudent, registerFaculty, logout,
       addODApplication, addAchievement,
-      saveAttendance, getAttendanceRecords,
-      getAllStudents, getAllFaculty, getAllODApplications, updateODStatus,
+      saveAttendance, getAttendanceRecords: getAttendanceRecordsFn,
+      getAllStudents, getAllFaculty, getAllODApplications, updateODStatus: updateODStatusFn,
     }}>
       {children}
     </AuthContext.Provider>
