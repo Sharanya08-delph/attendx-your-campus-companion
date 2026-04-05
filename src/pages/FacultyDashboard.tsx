@@ -192,9 +192,9 @@ const AttendanceTab = () => {
 
   const markAll = (present: boolean) => setStudents(prev => prev.map(s => ({ ...s, present })));
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!period) { toast.error('Select period'); return; }
-    saveAttendance({ date, department, section, period, records: students, savedBy: facultyData?.email || '' });
+    await saveAttendance({ date, department, section, period, records: students, savedBy: facultyData?.email || '' });
     toast.success('Attendance saved!');
     setLoaded(false);
     setStudents([]);
