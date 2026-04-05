@@ -60,7 +60,7 @@ export interface AttendanceDoc {
   savedAt: string;
 }
 
-export const saveAttendanceRecord = async (record: AttendanceDoc) => {
+export const saveAttendanceRecord = async (record: Omit<AttendanceDoc, 'savedAt'>) => {
   const ref = await addDoc(collection(db, 'attendance'), { ...record, savedAt: new Date().toISOString() });
   return ref.id;
 };

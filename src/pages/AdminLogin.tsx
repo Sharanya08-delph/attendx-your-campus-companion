@@ -10,12 +10,16 @@ import { toast } from 'sonner';
 const AdminLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (login('admin', email, password)) {
+    setLoading(true);
+    const ok = await login('admin', email, password);
+    setLoading(false);
+    if (ok) {
       toast.success('Welcome, Admin!');
       navigate('/admin/dashboard');
     } else {
@@ -37,7 +41,9 @@ const AdminLogin = () => {
         <div className="text-sm">
           <Link to="/forgot-password" className="text-primary hover:underline">Forgot Password?</Link>
         </div>
-        <Button type="submit" className="w-full gradient-primary text-primary-foreground font-semibold">Sign In</Button>
+        <Button type="submit" className="w-full gradient-primary text-primary-foreground font-semibold" disabled={loading}>
+          {loading ? 'Signing in...' : 'Sign In'}
+        </Button>
       </form>
     </AuthLayout>
   );
