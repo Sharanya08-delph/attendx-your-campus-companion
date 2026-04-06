@@ -9,6 +9,7 @@ import {
   getAttendanceRecords as fetchAttendanceRecords,
   addODApplication as fireAddOD,
   getAllODApplications as fireGetAllODs,
+  getODApplicationsByStudent,
   updateODStatus as fireUpdateODStatus,
   addAchievementDoc,
   getAchievementsByStudent,
@@ -128,51 +129,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Listen to Firebase auth state
   useEffect(() => {
     const unsub = onAuthChange(async (user) => {
-      if (user) {
-        setCurrentUid(user.uid);
-        const fsUser = await getUser(user.uid);
-        if (fsUser) {
-          setIsAuthenticated(true);
-          setRole(fsUser.role);
-          if (fsUser.role === 'student') {
-            const achievements = await getAchievementsByStudent(user.uid);
-            const allODs = await fireGetAllODs();
-            const myODs = allODs.filter(od => od.studentUid === user.uid);
-            setStudentData({
-              uid: fsUser.uid,
-              name: fsUser.name,
-              department: fsUser.department,
-              section: fsUser.section || '',
-              regNo: fsUser.regNo || '',
-              email: fsUser.email,
-              phone: fsUser.phone,
-              attendance: Math.floor(Math.random() * 30) + 65,
-              achievements: achievements.map(a => ({ ...a, id: a.id! })),
-              odApplications: myODs.map(od => ({ ...od, id: od.id! })),
-            });
-          } else if (fsUser.role === 'faculty') {
-            setFacultyData({
-              uid: fsUser.uid,
-              name: fsUser.name,
-              email: fsUser.email,
-              phone: fsUser.phone,
-              department: fsUser.department,
-              isHOD: fsUser.isHOD || false,
-            });
+      try {
+        if (user) {
+          setCurrentUid(user.uid);
+          const fsUser = await getUser(user.uid);
+
+          if (fsUser) {
+            setIsAuthenticated(true);
+            setRole(fsUser.role);
+
+            if (fsUser.role === 'student') {
+              const [achievements, myODs] = await Promise.all([
+                getAchievementsByStudent(user.uid).catch(() => []),
+                getODApplicationsByStudent(user.uid).catch(() => []),
+              ]);
+
+              setStudentData({
+                uid: fsUser.uid,
+                name: fsUser.name,
+                department: fsUser.department,
+                section: fsUser.section || '',
+                regNo: fsUser.regNo || '',
+                email: fsUser.email,
+                phone: fsUser.phone,
+                attendance: Math.floor(Math.random() * 30) + 65,
+                achievements: achievements.map(a => ({ ...a, id: a.id! })),
+                odApplications: myODs.map(od => ({ ...od, id: od.id! })),
+              });
+            } else if (fsUser.role === 'faculty') {
+              setFacultyData({
+                uid: fsUser.uid,
+                name: fsUser.name,
+                email: fsUser.email,
+                phone: fsUser.phone,
+                department: fsUser.department,
+                isHOD: fsUser.isHOD || false,
+              });
+            }
+            // admin has no extra data
+          } else if (user.email === ADMIN_EMAIL) {
+            setIsAuthenticated(true);
+            setRole('admin');
+          } else {
+            setIsAuthenticated(false);
+            setRole(null);
+            setStudentData(null);
+            setFacultyData(null);
           }
-          // admin has no extra data
-        } else if (user.email === ADMIN_EMAIL) {
-          setIsAuthenticated(true);
-          setRole('admin');
+        } else {
+          setIsAuthenticated(false);
+          setRole(null);
+          setStudentData(null);
+          setFacultyData(null);
+          setCurrentUid(null);
         }
-      } else {
+      } catch (error) {
+        console.error('Auth state sync error:', error);
         setIsAuthenticated(false);
         setRole(null);
         setStudentData(null);
         setFacultyData(null);
-        setCurrentUid(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
     return unsub;
   }, []);

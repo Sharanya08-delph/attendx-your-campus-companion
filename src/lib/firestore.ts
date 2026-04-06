@@ -105,6 +105,12 @@ export const getAllODApplications = async () => {
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as ODDoc));
 };
 
+export const getODApplicationsByStudent = async (studentUid: string) => {
+  const q = query(collection(db, 'odApplications'), where('studentUid', '==', studentUid));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as ODDoc));
+};
+
 export const updateODStatus = async (id: string, status: 'approved' | 'rejected') => {
   await updateDoc(doc(db, 'odApplications', id), { status });
 };
