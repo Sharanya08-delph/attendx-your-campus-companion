@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthLayout from '@/components/AuthLayout';
@@ -10,26 +10,35 @@ import { toast } from 'sonner';
 const StudentLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const { login, isAuthenticated, role, loading } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && isAuthenticated && role === 'student') {
+      navigate('/student/dashboard');
+    }
+  }, [loading, isAuthenticated, role, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.endsWith('.ritchennai.edu.in')) {
-      toast.error('Use only college mail ID');
+      toast.error('Use only college mail id');
       return;
     }
-    setLoading(true);
+    setSubmitting(true);
     const ok = await login('student', email, password);
-    setLoading(false);
-    if (ok) {
-      toast.success('Welcome back!');
-      navigate('/student/dashboard');
-    } else {
+    if (!ok) {
+      setSubmitting(false);
       toast.error('Invalid credentials. Please try again.');
     }
   };
+
+  useEffect(() => {
+    if (!loading) {
+      setSubmitting(false);
+    }
+  }, [loading]);
 
   return (
     <AuthLayout title="Student Login" subtitle="Access your attendance dashboard">
@@ -45,8 +54,8 @@ const StudentLogin = () => {
         <div className="flex justify-between items-center text-sm">
           <Link to="/forgot-password" className="text-primary hover:underline">Forgot Password?</Link>
         </div>
-        <Button type="submit" className="w-full gradient-primary text-primary-foreground font-semibold" disabled={loading}>
-          {loading ? 'Signing in...' : 'Sign In'}
+        <Button type="submit" className="w-full gradient-primary text-primary-foreground font-semibold" disabled={submitting || loading}>
+          {submitting || loading ? 'Signing in...' : 'Sign In'}
         </Button>
         <p className="text-center text-sm text-muted-foreground">
           New user? <Link to="/student/register" className="text-primary font-semibold hover:underline">Create Account</Link>
