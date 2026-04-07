@@ -197,6 +197,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const registerStudent = async (data: Omit<StudentData, 'uid' | 'attendance' | 'achievements' | 'odApplications'> & { password: string }): Promise<boolean> => {
+    setLoading(true);
     try {
       const { password, ...rest } = data;
       const cred = await signUp(data.email, password);
@@ -213,11 +214,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return true;
     } catch (e: any) {
       console.error('Register student error:', e);
+      setLoading(false);
       return false;
     }
   };
 
   const registerFaculty = async (data: Omit<FacultyData, 'uid'> & { password: string }): Promise<boolean> => {
+    setLoading(true);
     try {
       const { password, ...rest } = data;
       const cred = await signUp(data.email, password);
@@ -233,17 +236,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return true;
     } catch (e: any) {
       console.error('Register faculty error:', e);
+      setLoading(false);
       return false;
     }
   };
 
   const login = async (r: UserRole, email: string, password: string): Promise<boolean> => {
+    setLoading(true);
     try {
       await signIn(email, password);
-      // onAuthChange will handle setting state
       return true;
     } catch (e: any) {
       console.error('Login error:', e);
+      setLoading(false);
       return false;
     }
   };
